@@ -7,36 +7,16 @@ __doc__ = """Tool for converting a file from binary (.bin) format to text (.txt)
 __version__ = "1.0.0"
 
 
-def byte_to_str(
-    byte: bytes,
-    type: Literal["bin", "hex"],
-    endian: Literal["little", "big"],
-    depth: int,
-):
-    number = int.from_bytes(byte, endian)
-
-    if type == "bin":
-        str_type = "b"
-    elif type == "hex":
-        str_type = "x"
-        depth //= 4
-
-    str_format = "0" + str(depth) + str_type
-    string = format(number, str_format)
-
-    return string.upper()
+def depth_validation(depth: str) -> int:
+    depth = int(depth)
+    if depth % 8 == 0:
+        return depth
+    else:
+        raise ValueError("Error: Depth must be a multiple of 8!")
 
 
-def main() -> int:
+def parse_args(arg_list: list[str] | None) -> argparse.Namespace:
     class Formatter(argparse.RawDescriptionHelpFormatter): ...
-
-    def depth_validation(depth: str) -> int:
-        depth = int(depth)
-        if depth % 8 == 0:
-            return depth
-        else:
-            print("Error: Depth must be a multiple of 8!")
-            raise ValueError
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=Formatter)
 
@@ -108,18 +88,48 @@ def main() -> int:
         version="%(prog)s " + __version__,
     )
 
-    args = parser.parse_args()
+    return parser.parse_args(arg_list)
+
+
+def get_endline(return_symbol: str):
+    if return_symbol == "n":
+        return "\n"
+    elif return_symbol == "r":
+        return "\r"
+    elif return_symbol == "rn":
+        return "\r\n"
+    else:
+        return "\r\n"
+
+
+def byte_to_str(
+    byte: bytes,
+    type: Literal["bin", "hex"],
+    endian: Literal["little", "big"],
+    depth: int,
+):
+    number = int.from_bytes(byte, endian)
+
+    if type == "bin":
+        str_type = "b"
+    elif type == "hex":
+        str_type = "x"
+        depth //= 4
+
+    str_format = "0" + str(depth) + str_type
+    string = format(number, str_format)
+
+    return string.upper()
+
+
+def main(arg_list: list[str] | None = None) -> int:
+    args = parse_args(arg_list)
 
     if os.path.isfile(args.bin_file) is False:
         print(f"Error: {args.bin_file} is not an existing regular file!")
         return 1
 
-    if args.line == "n":
-        end_line = "\n"
-    elif args.line == "r":
-        end_line = "\r"
-    elif args.line == "rn":
-        end_line = "\r\n"
+    end_line = get_endline(args.line)
 
     with open(args.bin_file, "rb") as bin_file:
         with open(args.txt_file, "w", newline=end_line) as txt_file:
@@ -130,14 +140,14 @@ def main() -> int:
 
                 if 0 < len(bin_content) < (args.depth // 8):
                     if args.fill == "1":
-                        bin_content = bin_content.ljust(args.depth // 8, b"\xFF")
+                        bin_content = bin_content.ljust(args.depth // 8, b"\xff")
 
                 if not bin_content:
                     if line_count >= (args.words):
                         break
                     elif line_count < (args.words):
                         if args.fill == "1":
-                            bin_content = bin_content.ljust(args.depth // 8, b"\xFF")
+                            bin_content = bin_content.ljust(args.depth // 8, b"\xff")
 
                 line_count += 1
 
@@ -145,6 +155,7 @@ def main() -> int:
                     bin_content, args.out_type, args.endian, args.depth
                 )
                 txt_file.write(f"{string}\n")
+
     return 0
 
 
